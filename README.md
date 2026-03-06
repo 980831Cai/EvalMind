@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/EvalMind-AI%20Agent%20Evaluation-6366f1?style=for-the-badge&logoColor=white" alt="EvalMind" />
+  <img src="https://img.shields.io/badge/EvalMind-AI%20Agent%20Evaluation-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMiIgY3k9IjMwIiByPSI5IiBmaWxsPSIjZmJiZjI0Ii8+PGNpcmNsZSBjeD0iNDIiIGN5PSIzMCIgcj0iOSIgZmlsbD0iI2ZiYmYyNCIvPjxjaXJjbGUgY3g9IjIzIiBjeT0iMjkuNSIgcj0iMi44IiBmaWxsPSIjMWUxYjRiIi8+PGNpcmNsZSBjeD0iNDMiIGN5PSIyOS41IiByPSIyLjgiIGZpbGw9IiMxZTFiNGIiLz48L3N2Zz4=&logoColor=white" alt="EvalMind" />
 </p>
 
-<h1 align="center">EvalMind</h1>
+<h1 align="center">🦉 EvalMind</h1>
 
 <p align="center">
-  <strong>Open-Source Evaluation Platform for AI Agents</strong>
+  <strong>Open-Source Evaluation Platform for AI Agents</strong><br/>
+  <em>Self-hosted · Privacy-first · Full evaluation lifecycle</em>
 </p>
 
 <p align="center">
@@ -28,15 +29,22 @@
 
 ## What is EvalMind?
 
-EvalMind is an open-source evaluation platform for AI Agents. It provides end-to-end testing and scoring infrastructure — from agent integration and test case management through automated multi-dimensional evaluation, observability tracing, online assessment, human annotation, all the way to strategy evolution.
+EvalMind is an open-source, **self-hosted** evaluation platform for AI Agents. It provides end-to-end testing and scoring infrastructure — from agent integration and test case management through automated multi-dimensional evaluation, observability tracing, online assessment, human annotation, all the way to strategy evolution.
 
-EvalMind connects to your agent via HTTP, OpenAI-compatible API, or SDK, then runs your test suites against it, scores the results using multiple judge models, and surfaces actionable insights through a rich analytics dashboard.
+EvalMind connects to your agent via HTTP, OpenAI-compatible API, or SDK, runs your test suites against it, scores the results using multiple judge models, and surfaces actionable insights through a rich analytics dashboard.
 
 ### Why EvalMind Exists
 
 AI Agents are becoming critical infrastructure. Teams ship new prompts, swap models, and add tools constantly. But how do you know if your agent actually got *better*? Without systematic evaluation, you're flying blind — regressions slip through, edge cases go unnoticed, and "it works on my machine" becomes the only quality bar.
 
 EvalMind closes that gap by providing **automated, repeatable, multi-dimensional evaluation** that can run against every iteration of your agent. Think of it as CI/CD for agent quality.
+
+### Why Self-Hosted?
+
+- **Data privacy** — Your evaluation data, agent outputs, and test cases never leave your infrastructure. No third-party SaaS has access to your proprietary prompts or user interactions.
+- **Full control** — Deploy on your own servers, customize scoring logic, and integrate with your existing CI/CD pipeline.
+- **No vendor lock-in** — Use any LLM provider as the judge model. Swap between OpenAI, DeepSeek, Anthropic, Google Gemini, or run fully offline with Ollama.
+- **Cost-effective** — No per-seat pricing or usage limits. Run as many evaluations as you need.
 
 > **Note**
 >
@@ -50,62 +58,148 @@ EvalMind closes that gap by providing **automated, repeatable, multi-dimensional
 
 ### Prerequisites
 
-| Dependency | Version |
-|---|---|
-| **Python** | 3.12+ |
-| **Node.js** | 18+ |
-| **MySQL** | 8.0 |
+| Dependency | Version | Install |
+|---|---|---|
+| **Python** | 3.12+ | [python.org](https://www.python.org/downloads/) |
+| **Node.js** | 18+ | [nodejs.org](https://nodejs.org/) |
+| **Docker** | 20.10+ | [docker.com](https://www.docker.com/products/docker-desktop/) (for MySQL) |
 
-### 1. Clone and Install
+### One-Command Setup
 
+<details open>
+<summary><strong>🐧 Linux / 🍎 macOS</strong></summary>
+
+```bash
+# Clone
+git clone https://github.com/980831Cai/EvalMind.git && cd EvalMind
+
+# Database + Backend + Frontend — all in one go
+cd backend && bash setup-database.sh && \
+  python3 -m venv venv && source venv/bin/activate && \
+  pip install -r requirements.txt && \
+  cp .env.example .env && \
+  npx prisma generate && npx prisma db push && \
+  uvicorn main:app --reload --host 0.0.0.0 --port 8000 &
+cd ../frontend && npm install && npm run dev
+```
+
+</details>
+
+<details>
+<summary><strong>🪟 Windows (PowerShell)</strong></summary>
+
+```powershell
+# Clone
+git clone https://github.com/980831Cai/EvalMind.git; cd EvalMind
+
+# Database (requires Docker Desktop running)
+cd backend; bash setup-database.sh
+
+# Backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+npx prisma generate
+npx prisma db push
+Start-Process -NoNewWindow uvicorn -ArgumentList "main:app","--reload","--host","0.0.0.0","--port","8000"
+
+# Frontend (new terminal)
+cd ..\frontend
+npm install
+npm run dev
+```
+
+</details>
+
+### Step-by-Step Setup
+
+If you prefer a step-by-step approach:
+
+**1. Clone**
 ```bash
 git clone https://github.com/980831Cai/EvalMind.git
 cd EvalMind
 ```
 
-### 2. Set Up the Database
-
+**2. Database** — starts a MySQL 8.0 container via Docker
 ```bash
 cd backend
 bash setup-database.sh
-cd ..
 ```
 
-### 3. Backend Setup
-
+**3. Backend**
 ```bash
-cd backend
+python3 -m venv venv && source venv/bin/activate   # Linux/macOS
+# python -m venv venv; .\venv\Scripts\Activate.ps1  # Windows
 
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate        # Linux / macOS
-# .\venv\Scripts\Activate.ps1   # Windows (PowerShell)
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env — choose your LLM provider and fill in your API key
-# Supported: OpenAI / DeepSeek / Anthropic / Google Gemini / Ollama
-
-# Initialize database
+cp .env.example .env        # Edit .env → choose your LLM provider, add API key
 npx prisma generate
 npx prisma db push
-
-# Start backend (dev mode)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Frontend Setup (new terminal)
-
+**4. Frontend** (new terminal)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend: **http://localhost:5173** | Backend API docs: **http://localhost:8000/docs**
+**Done!** Open **http://localhost:5173** 🎉
+
+> Backend API docs available at **http://localhost:8000/docs**
+
+---
+
+## Configuration
+
+After setup, edit `backend/.env` to configure your LLM judge model. Choose any provider:
+
+```bash
+# Pick ONE provider and fill in your API key:
+
+# OpenAI
+JUDGE_LLM_BASE_URL=https://api.openai.com/v1
+JUDGE_LLM_API_KEY=sk-your-key
+JUDGE_LLM_MODEL=gpt-4o
+
+# DeepSeek
+JUDGE_LLM_BASE_URL=https://api.deepseek.com/v1
+JUDGE_LLM_API_KEY=sk-your-key
+JUDGE_LLM_MODEL=deepseek-chat
+
+# Anthropic Claude
+JUDGE_LLM_BASE_URL=https://api.anthropic.com/v1
+JUDGE_LLM_API_KEY=sk-ant-your-key
+JUDGE_LLM_MODEL=claude-sonnet-4-20250514
+
+# Google Gemini
+JUDGE_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+JUDGE_LLM_API_KEY=your-google-key
+JUDGE_LLM_MODEL=gemini-2.0-flash
+
+# Ollama (local, no API key required)
+JUDGE_LLM_BASE_URL=http://localhost:11434/v1
+JUDGE_LLM_API_KEY=ollama
+JUDGE_LLM_MODEL=qwen2.5:14b
+```
+
+You can also configure judge models directly in the **Settings** page of the web UI. Pre-configured templates for all major providers are included — just add your API key.
+
+> Any service compatible with the OpenAI Chat Completions API is supported.
+
+### All Environment Variables
+
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | MySQL connection string | `mysql://user:pass@localhost:3306/db` |
+| `JUDGE_LLM_BASE_URL` | Yes | Judge LLM API endpoint | `https://api.openai.com/v1` |
+| `JUDGE_LLM_API_KEY` | Yes | Your LLM API key | `sk-...` |
+| `JUDGE_LLM_MODEL` | Yes | Judge model name | `gpt-4o` |
+| `CORS_ORIGINS` | No | Allowed CORS origins | `*` |
+| `LOG_LEVEL` | No | Log level | `INFO` |
 
 ---
 
@@ -135,11 +229,13 @@ Frontend: **http://localhost:5173** | Backend API docs: **http://localhost:8000/
 - **Evolution tracking** — agent version score trends over time
 
 ### Platform
+- **Self-hosted & private** — all data stays on your infrastructure
 - **Online evaluation** — production referenceless real-time assessment
 - **Human annotation** — annotation queue task management
 - **Gene store** — store fix/optimization/innovation strategy prompt patches
 - **Playground** — interactive agent debugging
 - **Python & TypeScript SDK** — quick integration
+- **i18n** — English & Chinese UI
 
 ---
 
@@ -169,7 +265,7 @@ Frontend: **http://localhost:5173** | Backend API docs: **http://localhost:8000/
                            │ Prisma ORM
 ┌──────────────────────────▼────────────────────────────────┐
 │                     MySQL 8.0                             │
-│  18 Models: Agent · TestSuite · EvalRun · EvalResult ...  │
+│  20 Models: Agent · TestSuite · EvalRun · EvalResult ...  │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -191,36 +287,6 @@ Create EvalRun → Snapshot Agent & TestSuite → Async Execution
   │ (optional)   │    │ Cause Analysis│    │ Management   │
   └──────────────┘    └───────────────┘    └──────────────┘
 ```
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Required | Description | Example |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | MySQL connection string | `mysql://user:pass@localhost:3306/dbname` |
-| `JUDGE_LLM_BASE_URL` | Yes | Judge LLM API endpoint | `https://api.deepseek.com/v1` |
-| `JUDGE_LLM_API_KEY` | Yes | Judge LLM API key | `sk-xxx` |
-| `JUDGE_LLM_MODEL` | Yes | Judge model name | `deepseek-chat` |
-| `CORS_ORIGINS` | No | Allowed CORS origins | `*` |
-| `LOG_LEVEL` | No | Log level | `INFO` |
-
-### Supported LLM Providers
-
-| Provider | BASE_URL | MODEL |
-|---|---|---|
-| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o` / `gpt-4o-mini` |
-| **DeepSeek** | `https://api.deepseek.com/v1` | `deepseek-chat` |
-| **Anthropic** | `https://api.anthropic.com/v1` | `claude-sonnet-4-20250514` |
-| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
-| **Ollama** (local) | `http://localhost:11434/v1` | `qwen2.5:14b` |
-| **vLLM** | `http://localhost:8080/v1` | custom model name |
-| **Azure OpenAI** | `https://{name}.openai.azure.com/...` | deployment name |
-
-> Any service compatible with the OpenAI Chat Completions API can be used.
-> Pre-configured model templates are available in the Settings page — just add your API key.
 
 ---
 
@@ -314,7 +380,7 @@ EvalMind/
 │   │   ├── core/               # Core config (config/database/logging)
 │   │   ├── models/             # Pydantic data models
 │   │   └── types/              # Type definitions
-│   ├── prisma/schema.prisma    # Database schema (18 models)
+│   ├── prisma/schema.prisma    # Database schema (20 models)
 │   ├── migrations/             # SQL migration files
 │   ├── tests/                  # Test suite
 │   └── requirements.txt        # Python dependencies
@@ -358,7 +424,7 @@ After starting the server, auto-generated API documentation is available at:
 | `/api/eval-runs` | GET/POST | Evaluation runs |
 | `/api/eval-runs/{id}/results` | GET | Evaluation results |
 | `/api/dashboard/stats` | GET | Dashboard statistics |
-| `/api/model-config` | GET/POST | Judge model configuration |
+| `/api/model-configs` | GET/POST | Judge model configuration |
 | `/api/v2/traces` | POST | Public trace ingestion API |
 | `/api/v1/traces` | POST | OTLP protocol receiver |
 
@@ -411,5 +477,5 @@ git push origin feat/your-feature
 ---
 
 <p align="center">
-  <strong>EvalMind — Making AI Agent evaluation systematic and reliable.</strong>
+  <strong>🦉 EvalMind — Making AI Agent evaluation systematic and reliable.</strong>
 </p>
