@@ -1,28 +1,28 @@
 ---
-name: Bug 报告
-about: 报告一个 Bug
+name: Bug Report
+about: Report a bug
 labels: bug
 ---
 
-## Bug 描述
+## Bug Description
 
-<!-- 清晰描述遇到的问题 -->
+<!-- Clearly describe the issue you encountered -->
 
-## 复现步骤
+## Steps to Reproduce
 
 1.
 2.
 3.
 
-## 期望行为
+## Expected Behavior
 
-<!-- 期望发生什么 -->
+<!-- What did you expect to happen? -->
 
-## 实际行为
+## Actual Behavior
 
-<!-- 实际发生了什么 -->
+<!-- What actually happened? -->
 
-## 环境信息
+## Environment
 
 - OS:
 - Python:

@@ -1,4 +1,4 @@
-"""Agent 评测平台 - 后端入口"""
+"""EvalMind - AI Agent Evaluation Platform Backend"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     from app.core.config import settings
     setup_logging(log_level=settings.LOG_LEVEL)
     await connect_db()
-    # 启动在线评估 Worker
+    # Start online evaluation worker
     from app.services.online_eval_worker import start_worker, stop_worker
     await start_worker()
     yield
@@ -32,12 +32,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Agent 评测平台",
-    description="""通用 AI Agent 评测平台 — 支持任何语言通过 HTTP API 接入。
+    title="EvalMind - AI Agent Evaluation Platform",
+    description="""Open-source evaluation platform for AI Agents — integrate any agent via HTTP API.
 
-## 快速接入
+## Quick Start
 
-最简单的接入方式 — 用 curl 上报一条 Trace：
+The simplest way to ingest a trace — use curl:
 
 ```bash
 curl -X POST http://localhost:8000/api/v2/traces \\
@@ -45,15 +45,15 @@ curl -X POST http://localhost:8000/api/v2/traces \\
   -d '{"name": "chat", "input": "hello", "output": "hi"}'
 ```
 
-## 接入方式
+## Integration Methods
 
-| 方式 | 适用场景 |
-|------|---------|
-| **REST API v2** (`/api/v2/`) | 任何语言，通过 HTTP 直接上报 |
-| **Python SDK** | Python 项目，装饰器/Context Manager |
-| **TypeScript SDK** | Node.js 项目 |
-| **OTel OTLP** (`/api/v1/traces`) | 已使用 OpenTelemetry 的项目 |
-| **Webhook** (`/api/v2/webhook/`) | 接收外部平台推送 |
+| Method | Use Case |
+|--------|----------|
+| **REST API v2** (`/api/v2/`) | Any language, direct HTTP ingestion |
+| **Python SDK** | Python projects, decorator/context manager |
+| **TypeScript SDK** | Node.js projects |
+| **OTel OTLP** (`/api/v1/traces`) | Projects already using OpenTelemetry |
+| **Webhook** (`/api/v2/webhook/`) | Receive pushes from external platforms |
 """,
     version="6.0.0",
     lifespan=lifespan,
@@ -105,19 +105,19 @@ if os.path.exists(FRONTEND_DIR):
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    # 需要排除的路径前缀（API 路由和 FastAPI 内置文档路由）
+    # Reserved path prefixes (API routes and FastAPI built-in doc routes)
     _RESERVED_PREFIXES = ("api/", "docs", "redoc", "openapi.json")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        # API 和文档路由不由前端处理，返回 404 让 FastAPI 的路由系统处理
+        # API and doc routes are not handled by frontend — return 404 for FastAPI router
         if full_path.startswith("api/"):
             from fastapi.responses import JSONResponse
             return JSONResponse(status_code=404, content={"detail": "Not Found"})
-        # FastAPI 内置文档路由：不拦截，让 FastAPI 自己处理
-        # 注意：docs/redoc/openapi.json 由 FastAPI 自动注册，不会走到这里
+        # FastAPI built-in doc routes: don't intercept, let FastAPI handle them
+        # Note: docs/redoc/openapi.json are auto-registered by FastAPI and won't reach here
         file_path = os.path.normpath(os.path.join(FRONTEND_DIR, full_path))
-        # 路径穿越防护
+        # Path traversal protection
         if not file_path.startswith(FRONTEND_DIR):
             from fastapi.responses import JSONResponse
             return JSONResponse(status_code=403, content={"detail": "Forbidden"})

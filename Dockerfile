@@ -16,7 +16,7 @@ FROM python:3.12-slim AS backend
 
 WORKDIR /app
 
-# Install system deps for mysqlclient/prisma/re2
+# Install system deps for prisma/re2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm libre2-dev && \
     rm -rf /var/lib/apt/lists/*
@@ -34,8 +34,6 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Generate Prisma client
 WORKDIR /app/backend
 RUN npx prisma generate
-
-WORKDIR /app/backend
 
 # Expose port
 EXPOSE 8000

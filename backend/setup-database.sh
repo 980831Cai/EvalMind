@@ -1,49 +1,49 @@
 #!/bin/bash
 
-echo "🚀 Agent 评测平台数据库安装脚本"
+echo "EvalMind Database Setup Script"
 echo "================================"
 
-# 检查 Docker
+# Check Docker
 if ! command -v docker &> /dev/null; then
-    echo "❌ Docker 未安装"
+    echo "ERROR: Docker is not installed"
     echo ""
-    echo "请先安装 Docker:"
+    echo "Please install Docker first:"
     echo "  macOS: brew install --cask docker"
     echo "  Linux: curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"
-    echo "  或访问: https://www.docker.com/products/docker-desktop"
+    echo "  Or visit: https://www.docker.com/products/docker-desktop"
     exit 1
 fi
 
-echo "✅ Docker 已安装"
+echo "OK: Docker is installed"
 
-# 检查 Docker 是否运行
+# Check Docker is running
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker 未运行，请启动 Docker Desktop"
+    echo "ERROR: Docker is not running. Please start Docker Desktop."
     exit 1
 fi
 
-echo "✅ Docker 正在运行"
+echo "OK: Docker is running"
 
-# 创建数据目录
-echo "📁 创建数据目录..."
+# Create data directory
+echo "Creating data directory..."
 mkdir -p ~/agent-eval-data
 
-# 检查容器是否已存在
+# Check if container already exists
 if docker ps -a | grep -q agent-eval-mysql; then
-    echo "⚠️  检测到已存在的容器"
-    read -p "是否删除并重新创建？(y/n) " -n 1 -r
+    echo "WARNING: Existing container detected"
+    read -p "Delete and recreate? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "🗑️  删除旧容器..."
+        echo "Removing old container..."
         docker rm -f agent-eval-mysql
     else
-        echo "❌ 已取消"
+        echo "Cancelled."
         exit 1
     fi
 fi
 
-# 启动 MySQL
-echo "📦 启动 MySQL 容器..."
+# Start MySQL
+echo "Starting MySQL container..."
 MYSQL_ROOT_PWD=${MYSQL_ROOT_PASSWORD:-agent_eval_2024}
 MYSQL_DB=${MYSQL_DATABASE:-agent_eval_platform}
 MYSQL_USR=${MYSQL_USER:-agent_eval}
@@ -63,21 +63,21 @@ docker run -d \
   --collation-server=utf8mb4_unicode_ci
 
 if [ $? -ne 0 ]; then
-    echo "❌ MySQL 容器启动失败"
+    echo "ERROR: Failed to start MySQL container"
     echo ""
-    echo "常见问题："
-    echo "  1. 端口 3306 被占用：lsof -i :3306"
-    echo "  2. Docker 没有权限：检查 Docker Desktop 设置"
+    echo "Common issues:"
+    echo "  1. Port 3306 is already in use: lsof -i :3306"
+    echo "  2. Docker permission issue: check Docker Desktop settings"
     exit 1
 fi
 
-echo "✅ MySQL 容器已启动"
+echo "OK: MySQL container started"
 
-# 等待 MySQL 启动
-echo "⏳ 等待 MySQL 初始化..."
+# Wait for MySQL to be ready
+echo "Waiting for MySQL to initialize..."
 for i in {1..30}; do
     if docker exec agent-eval-mysql mysqladmin ping -h localhost --silent > /dev/null 2>&1; then
-        echo "✅ MySQL 已就绪"
+        echo "OK: MySQL is ready"
         break
     fi
     echo -n "."
@@ -85,81 +85,82 @@ for i in {1..30}; do
 done
 echo ""
 
-# 验证连接
+# Verify connection
 if ! docker exec agent-eval-mysql mysql -uagent_eval -pagent_eval_pass -e "SELECT 1;" > /dev/null 2>&1; then
-    echo "❌ 数据库连接失败"
+    echo "ERROR: Database connection failed"
     exit 1
 fi
 
-echo "✅ 数据库连接成功"
+echo "OK: Database connection successful"
 
-# 导入 Schema
+# Import Schema
 if [ -f "migrations/mvp_schema.sql" ]; then
-    echo "📥 导入数据库 Schema..."
+    echo "Importing database schema..."
     docker exec -i agent-eval-mysql mysql -uagent_eval -pagent_eval_pass agent_eval_platform < migrations/mvp_schema.sql
     
     if [ $? -eq 0 ]; then
-        echo "✅ Schema 导入成功"
+        echo "OK: Schema imported successfully"
     else
-        echo "⚠️  Schema 导入失败，请手动检查"
+        echo "WARNING: Schema import failed, please check manually"
     fi
 else
-    echo "⚠️  未找到 migrations/mvp_schema.sql，跳过导入"
+    echo "WARNING: migrations/mvp_schema.sql not found, skipping import"
 fi
 
-# 验证表创建
-echo "📊 验证数据库表..."
+# Verify tables
+echo "Verifying database tables..."
 TABLE_COUNT=$(docker exec agent-eval-mysql mysql -uagent_eval -pagent_eval_pass agent_eval_platform -se "SHOW TABLES;" | wc -l)
-echo "   已创建 $TABLE_COUNT 个表"
+echo "   Created $TABLE_COUNT tables"
 
 if [ $TABLE_COUNT -gt 0 ]; then
     docker exec agent-eval-mysql mysql -uagent_eval -pagent_eval_pass agent_eval_platform -e "SHOW TABLES;"
 fi
 
-# 创建 .env 文件（如果不存在）
+# Create .env file if it doesn't exist
 if [ ! -f ".env" ]; then
-    echo "📝 创建 .env 文件..."
+    echo "Creating .env file..."
     cat > .env << 'EOF'
-# 数据库配置
+# Database configuration
 DATABASE_URL=mysql://agent_eval:agent_eval_pass@localhost:3306/agent_eval_platform
 
-# Judge LLM 配置（需要替换为实际的 API Key）
+# Judge LLM configuration (replace with your actual API key)
 JUDGE_LLM_BASE_URL=https://api.openai.com/v1
 JUDGE_LLM_API_KEY=your-openai-api-key-here
 JUDGE_LLM_MODEL=gpt-4o
 
-# 应用配置
+# Application configuration
 PORT=8000
 NODE_ENV=development
 EOF
-    echo "✅ .env 文件已创建"
-    echo "⚠️  请编辑 .env 文件，替换 JUDGE_LLM_API_KEY"
+    echo "OK: .env file created"
+    echo "NOTE: Please edit .env and replace JUDGE_LLM_API_KEY with your actual key"
 else
-    echo "ℹ️  .env 文件已存在，跳过创建"
+    echo "INFO: .env file already exists, skipping creation"
 fi
 
 echo ""
-echo "═══════════════════════════════════"
-echo "🎉 数据库安装成功！"
-echo "═══════════════════════════════════"
+echo "==================================="
+echo "Database setup complete!"
+echo "==================================="
 echo ""
-echo "📝 连接信息："
+echo "Connection info:"
 echo "   Host:     localhost"
 echo "   Port:     3306"
 echo "   Database: agent_eval_platform"
 echo "   User:     agent_eval"
 echo "   Password: agent_eval_pass"
 echo ""
-echo "🔧 常用命令："
-echo "   查看日志: docker logs -f agent-eval-mysql"
-echo "   停止:     docker stop agent-eval-mysql"
-echo "   启动:     docker start agent-eval-mysql"
-echo "   重启:     docker restart agent-eval-mysql"
-echo "   连接:     docker exec -it agent-eval-mysql mysql -uagent_eval -pagent_eval_pass agent_eval_platform"
+echo "Useful commands:"
+echo "   View logs: docker logs -f agent-eval-mysql"
+echo "   Stop:      docker stop agent-eval-mysql"
+echo "   Start:     docker start agent-eval-mysql"
+echo "   Restart:   docker restart agent-eval-mysql"
+echo "   Connect:   docker exec -it agent-eval-mysql mysql -uagent_eval -pagent_eval_pass agent_eval_platform"
 echo ""
-echo "📚 下一步："
-echo "   1. 编辑 .env 文件，替换 API Key"
-echo "   2. 安装依赖: npm install 或 pnpm install"
-echo "   3. 生成 Prisma Client: npx prisma generate"
-echo "   4. 运行后端服务: npm run dev"
+echo "Next steps:"
+echo "   1. Edit .env and replace the API key"
+echo "   2. Install dependencies: pip install -r requirements.txt"
+echo "   3. Generate Prisma Client: npx prisma generate"
+echo "   4. Push schema to database: npx prisma db push"
+echo "   5. Start backend: uvicorn main:app --reload --host 0.0.0.0 --port 8000"
 echo ""

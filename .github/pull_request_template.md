@@ -1,26 +1,26 @@
-## 变更说明
+## Description
 
-<!-- 简要描述本次变更的内容和目的 -->
+<!-- Briefly describe the changes and their purpose -->
 
-## 变更类型
+## Change Type
 
-- [ ] 新功能 (feat)
-- [ ] Bug 修复 (fix)
-- [ ] 重构 (refactor)
-- [ ] 测试 (test)
-- [ ] 文档 (docs)
+- [ ] New feature (feat)
+- [ ] Bug fix (fix)
+- [ ] Refactoring (refactor)
+- [ ] Tests (test)
+- [ ] Documentation (docs)
 
-## 关联 Issue
+## Related Issue
 
-<!-- 关联的 Issue 编号，如 #123 -->
+<!-- Related issue number, e.g. #123 -->
 
-## 测试说明
+## Testing
 
-<!-- 描述如何验证本次变更 -->
+<!-- Describe how to verify these changes -->
 
 ## Checklist
 
-- [ ] 代码已通过 ruff/eslint 检查
-- [ ] 已编写/更新相关测试
-- [ ] CI 流水线通过
-- [ ] docker-compose up 仍可正常启动
+- [ ] Code passes ruff/eslint checks
+- [ ] Tests have been written/updated
+- [ ] CI pipeline passes
+- [ ] `docker compose up` still starts correctly

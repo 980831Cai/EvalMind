@@ -1,83 +1,83 @@
-# Contributing to Agent Eval Platform
+# Contributing to EvalMind
 
-感谢你对 Agent Eval Platform 的贡献兴趣！
+Thanks for your interest in contributing to EvalMind!
 
-## 开发环境搭建
+## Development Setup
 
-### 前置要求
+### Prerequisites
 
 - Python 3.12+
 - Node.js 20+
-- MySQL 8.0（或通过 Docker Compose）
+- MySQL 8.0
 
-### 快速启动
+### Quick Start
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd agent-eval-platform
+# 1. Clone the project
+git clone https://github.com/980831Cai/EvalMind.git
+cd EvalMind
 
-# 2. 复制环境变量
+# 2. Copy environment variables
 cp .env.example .env
-# 编辑 .env 填入 JUDGE_LLM_API_KEY
+# Edit .env — fill in JUDGE_LLM_API_KEY
 
-# 3. 启动数据库
-docker compose up mysql -d
-
-# 4. 后端开发
+# 3. Set up the database
 cd backend
+bash setup-database.sh
+
+# 4. Backend development
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 npx prisma generate
 npx prisma db push
 python -m uvicorn main:app --reload
 
-# 5. 前端开发
+# 5. Frontend development (new terminal)
 cd frontend
 npm install
 npm run dev
 ```
 
-## 分支命名
+## Branch Naming
 
-- `feat/xxx` — 新功能
-- `fix/xxx` — Bug 修复
-- `refactor/xxx` — 重构
-- `docs/xxx` — 文档
-- `test/xxx` — 测试
+- `feat/xxx` — New feature
+- `fix/xxx` — Bug fix
+- `refactor/xxx` — Refactoring
+- `docs/xxx` — Documentation
+- `test/xxx` — Tests
 
-## Commit 规范
+## Commit Convention
 
-遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: 新增结构化评分器
-fix: 修复 eval_engine 并发安全问题
-refactor: 重构 scoring_engine Phase 3 分流
-test: 添加 structured_scorer 单元测试
-docs: 更新 CONTRIBUTING.md
+feat: add structured scorer
+fix: resolve eval_engine concurrency issue
+refactor: restructure scoring_engine phase 3 routing
+test: add structured_scorer unit tests
+docs: update CONTRIBUTING.md
 ```
 
-## 代码风格
+## Code Style
 
-- **Python**：使用 `ruff` 进行格式化和检查（配置见 `backend/ruff.toml`）
-- **TypeScript**：使用 `eslint` + `prettier`
-- **Pre-commit**：安装 `pre-commit install` 自动检查
+- **Python**: Use `ruff` for formatting and linting (config in `backend/ruff.toml`)
+- **TypeScript**: Use `eslint` + `prettier`
+- **Pre-commit**: Run `pre-commit install` for automatic checks
 
-## 测试
+## Testing
 
 ```bash
-# 后端测试
+# Backend tests
 cd backend && python -m pytest
 
-# 前端测试
+# Frontend tests
 cd frontend && npx vitest run
 ```
 
-## Pull Request 流程
+## Pull Request Process
 
-1. 从 `main` 创建功能分支
-2. 完成开发和测试
-3. 确保 CI 通过
-4. 提交 PR，填写模板
-5. 等待 Code Review
+1. Create a feature branch from `main`
+2. Complete development and testing
+3. Ensure CI passes
+4. Submit a PR using the template
+5. Wait for code review
