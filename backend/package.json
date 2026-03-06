@@ -1,0 +1,25 @@
+{
+  "name": "agent-eval-platform-backend",
+  "version": "1.0.0",
+  "description": "Agent Evaluation Platform Backend",
+  "main": "main.py",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
+  },
+  "keywords": [
+    "agent",
+    "evaluation",
+    "llm"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "prisma": "^6.1.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0"
+  }
+}

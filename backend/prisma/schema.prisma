@@ -1,0 +1,815 @@
+// ============================================================
+// Agent 评测平台 Prisma Schema
+// ============================================================
+// 版本: 5.0.0
+// 日期: 2026-03-03
+// 说明: MySQL + Prisma Client Python
+//       v3.0: 评估框架升级 - 新增模板/维度/BadCase/对比/Skills分析
+//       v3.1: 实验系统 + Dataset版本化 + 评测模板市场 + 数据上报网关 + 智能优化
+//       v4.0: OTel 可观测性 - 引入 Trace/Span 自有存储，替代 Langfuse 依赖
+//       v5.0: 独立 Score + AnnotationQueue + OnlineEvalConfig + Referenceless 标记
+// ============================================================
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 1. 模型配置
+// ============================================================
+model ModelConfig {
+  id String @id @default(uuid())
+
+  // 基础配置
+  name      String  @db.VarChar(100)
+  provider  String  @db.VarChar(50)    // openai, deepseek, anthropic, ollama
+  modelName String  @map("model_name") @db.VarChar(100)
+  baseUrl   String  @map("base_url") @db.VarChar(500)
+  apiKey    String  @map("api_key") @db.VarChar(500)
+
+  // 模型参数
+  temperature Float? @default(0.3)
+  maxTokens   Int?   @default(2048) @map("max_tokens")
+  topP        Float? @default(1.0) @map("top_p")
+
+  // 其他配置
+  config Json?
+
+  // Multi-Judge 配置
+  enableMultiJudge Boolean @default(false) @map("enable_multi_judge")
+  judgeCount       Int?    @default(3) @map("judge_count")
+
+  // 状态
+  isActive      Boolean   @default(true) @map("is_active")
+  lastTestedAt  DateTime? @map("last_tested_at")
+  testStatus    String?   @map("test_status") @db.VarChar(20)
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  evalRuns EvalRun[]
+
+  @@index([isActive])
+  @@index([provider])
+  @@map("judge_config")
+}
+
+// ============================================================
+// 2. Agent 配置
+// ============================================================
+model Agent {
+  id String @id @default(uuid())
+
+  // 基础信息
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  // Agent 配置
+  systemPrompt String? @map("system_prompt") @db.Text
+  skills       Json?   // [{"name": "web_search", "description": "..."}]
+  mcpConfig    Json?   @map("mcp_config")  // MCP 服务器配置
+
+  // 接入配置
+  agentType   String  @default("http") @map("agent_type") @db.VarChar(20) // http, openai, knot
+  agentConfig Json?   @map("agent_config") // 接入配置（URL, API Key 等）
+
+  // Agent 业务类型（用于评测经验聚合基准线）
+  agentCategory String @default("general") @map("agent_category") @db.VarChar(30) // customer_service, coding, search, writing, data_analysis, general
+
+  // 元数据
+  tags     Json?
+  metadata Json?
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  evalRuns EvalRun[]
+  traces   Trace[]
+  genes    Gene[]
+
+  @@index([name])
+  @@index([agentCategory])
+  @@index([createdAt])
+  @@map("agents")
+}
+
+// ============================================================
+// 3. 测试套件
+// ============================================================
+model TestSuite {
+  id String @id @default(uuid())
+
+  // 基础信息
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  // 测试用例
+  testCases Json @map("test_cases") // [{"id": "tc_001", "input": "...", "expected_output": "...", "metadata": {...}}]
+
+  // 版本化
+  version    Int     @default(1)
+  parentId   String? @map("parent_id")  // 父版本ID
+  changelog  String? @db.Text            // 版本变更说明
+
+  // 元数据
+  tags             Json?
+  source           String? @default("manual") @db.VarChar(50) // manual, generated
+  generationConfig Json?   @map("generation_config") // LLM 生成时的配置记录
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  evalRuns EvalRun[]
+
+  @@index([name])
+  @@index([source])
+  @@index([parentId])
+  @@index([createdAt])
+  @@map("test_suites")
+}
+
+// ============================================================
+// 4. 评测运行
+// ============================================================
+model EvalRun {
+  id String @id @default(uuid())
+
+  // 关联关系
+  agentId       String  @map("agent_id")
+  testSuiteId   String  @map("test_suite_id")
+  modelConfigId String? @map("judge_config_id")
+
+  // 配置快照
+  agentSnapshot     Json @map("agent_snapshot")
+  testSuiteSnapshot Json @map("test_suite_snapshot")
+
+  // 评测配置
+  dimensions              Json    @db.Json // ["accuracy", "helpfulness"]
+  enableSkillsEval        Boolean @default(false) @map("enable_skills_eval")
+  enableTrajectoryEval    Boolean @default(false) @map("enable_trajectory_eval")
+  trajectoryDimensions    Json?   @map("trajectory_dimensions") // ["trajectory_tool_selection", ...]
+  concurrency             Int?    @default(5)
+  timeout                 Int?    @default(60)
+
+  // v3.0 新增：评估框架扩展
+  templateId      String?  @map("template_id")       // 关联评估模板
+  modelOverride   String?  @map("model_override") @db.VarChar(100) // 跨模型对比时覆写模型
+  isBaseline      Boolean  @default(false) @map("is_baseline")     // 是否为基线运行
+  baselineRunId   String?  @map("baseline_run_id")                 // 基线对比的源运行ID
+
+  // v3.2 新增：稳定性评估
+  repeatCount     Int     @default(1) @map("repeat_count")
+  passAtK         Json?   @map("pass_at_k") @db.Json
+
+  // 执行状态
+  status       EvalRunStatus @default(pending)
+  progress     Int           @default(0)
+  currentItem  Int           @default(0) @map("current_item")
+  totalItems   Int           @default(0) @map("total_items")
+
+  // 结果摘要
+  passedCount  Int?   @default(0) @map("passed_count")
+  failedCount  Int?   @default(0) @map("failed_count")
+  averageScore Float? @map("average_score")
+
+  // 错误信息
+  errorMessage String? @map("error_message") @db.Text
+
+  // 时间戳
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  // 关联
+  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  testSuite   TestSuite    @relation(fields: [testSuiteId], references: [id], onDelete: Cascade)
+  modelConfig ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
+  results     EvalResult[]
+
+  @@index([agentId])
+  @@index([testSuiteId])
+  @@index([modelConfigId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isBaseline])
+  @@map("eval_runs")
+}
+
+enum EvalRunStatus {
+  pending
+  running
+  completed
+  failed
+  cancelled
+}
+
+// ============================================================
+// 5. 评测结果
+// ============================================================
+model EvalResult {
+  id String @id @default(uuid())
+
+  // 关联关系
+  evalRunId  String @map("eval_run_id")
+  testCaseId String @map("test_case_id")
+
+  // v4.0: 关联 Trace（可观测性）
+  traceId String? @map("trace_id")
+
+  // 测试用例信息（快照）
+  input          String  @db.Text
+  expectedOutput String? @map("expected_output") @db.Text
+
+  // Agent 输出
+  agentOutput   String? @map("agent_output") @db.Text
+  agentThinking String? @map("agent_thinking") @db.Text
+
+  // Skills 使用记录
+  skillsCalled Json? @map("skills_called") // [{"skill": "web_search", "params": {...}, "result": {...}}]
+
+  // 轨迹数据
+  trajectory       Json? @db.Json // [{"step_index": 0, "step_type": "thinking", "content": "...", ...}]
+  trajectoryScores Json? @map("trajectory_scores") @db.Json // {"trajectory_tool_selection": 0.85, ...}
+  trajectoryOverall Float? @map("trajectory_overall")
+
+  // 评分
+  scores       Json  @db.Json // {"accuracy": 0.85, "helpfulness": 0.90}
+  overallScore Float @map("overall_score")
+  passed       Boolean
+
+  // v3.0 新增：断言结果
+  assertionResults Json? @map("assertion_results") @db.Json // [{type, value, passed, reason, critical}]
+  criticalFailure  Boolean? @default(false) @map("critical_failure")
+
+  // v3.2 新增：细粒度评估
+  subGoalResults    Json?   @map("sub_goal_results") @db.Json
+  progressRate      Float?  @map("progress_rate")
+  groundingAccuracy Float?  @map("grounding_accuracy")
+  toolEvalResults   Json?   @map("tool_eval_results") @db.Json
+  repeatResults     Json?   @map("repeat_results") @db.Json
+  failureAnalysis   Json?   @map("failure_analysis") @db.Json
+  costData          Json?   @map("cost_data") @db.Json
+
+  // 评分理由
+  reasoning            String? @db.Text
+  trajectoryReasoning  String? @map("trajectory_reasoning") @db.Text
+
+  // 执行信息
+  latencyMs  Int?  @map("latency_ms")
+  tokenUsage Json? @map("token_usage") // {"prompt": 100, "completion": 200}
+
+  // 错误信息
+  errorMessage String? @map("error_message") @db.Text
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 关联
+  evalRun EvalRun @relation(fields: [evalRunId], references: [id], onDelete: Cascade)
+  trace   Trace?  @relation(fields: [traceId], references: [id], onDelete: SetNull)
+
+  @@index([evalRunId])
+  @@index([testCaseId])
+  @@index([traceId])
+  @@index([passed])
+  @@index([overallScore])
+  @@index([createdAt])
+  @@map("eval_results")
+}
+
+// ============================================================
+// 6. 评估模板
+// ============================================================
+model EvalTemplate {
+  id              String   @id @default(uuid())
+  name            String   @db.VarChar(100)
+  category        String   @db.VarChar(50)    // generic, customer_service, coding, rag
+  description     String?  @db.Text
+  isBuiltin       Boolean  @default(false) @map("is_builtin")
+  dimensionConfig Json     @map("dimension_config") // [{dimensionId, weight, enabled}]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isBuiltin])
+  @@map("eval_templates")
+}
+
+// ============================================================
+// 7. 评估维度
+// ============================================================
+model EvalDimension {
+  id              String  @id @default(uuid())
+  name            String  @unique @db.VarChar(50)
+  displayName     String  @map("display_name") @db.VarChar(100)
+  description     String  @db.Text
+  layer           String  @db.VarChar(20)   // universal, category, business
+  scoringMethod   String  @map("scoring_method") @db.VarChar(20)   // code, llm, hybrid
+  scoringCriteria String? @map("scoring_criteria") @db.Text
+  evaluationSteps String? @map("evaluation_steps") @db.Text
+  weight          Float   @default(1.0)
+  requiresReference Boolean @default(true) @map("requires_reference")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([layer])
+  @@index([scoringMethod])
+  @@map("eval_dimensions")
+}
+
+// ============================================================
+// 8. Bad Case
+// ============================================================
+model BadCase {
+  id             String   @id @default(uuid())
+  agentId        String   @map("agent_id")
+  input          String   @db.Text
+  expectedOutput String?  @map("expected_output") @db.Text
+  actualOutput   String?  @map("actual_output") @db.Text
+  assertions     Json?
+  source         String   @db.VarChar(20)   // eval_result, manual, regression
+  evalResultId   String?  @map("eval_result_id")
+  status         String   @default("open") @db.VarChar(20)  // open, investigating, resolved, exported
+  tags           Json?
+  rootCause      String?  @map("root_cause") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([agentId])
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+  @@map("bad_cases")
+}
+
+// ============================================================
+// 9. 跨模型对比运行
+// ============================================================
+model ComparisonRun {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(200)
+  mode           String   @db.VarChar(20)   // quick, free
+  testSuiteId    String   @map("test_suite_id")
+  templateId     String?  @map("template_id")
+  evalRunIds     Json     @map("eval_run_ids")     // [runId1, runId2, ...]
+  modelLabels    Json     @map("model_labels")     // ["gpt-4o", "deepseek-v3", ...]
+  repeatCount    Int      @default(1) @map("repeat_count")
+  comparisonData Json?    @map("comparison_data")  // 聚合对比数据缓存
+  status         String   @default("pending") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([testSuiteId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("comparison_runs")
+}
+
+// ============================================================
+// 10. 实验 (Experiment)
+// ============================================================
+model Experiment {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+
+  // 关联
+  agentId     String   @map("agent_id")
+  testSuiteId String   @map("test_suite_id")
+
+  // 实验变量配置: [{type: "model"|"prompt"|"temperature"|"tool_config", values: [...]}]
+  variables   Json     @db.Json
+  // 关联的评测运行ID: [runId1, runId2, ...]
+  evalRunIds  Json     @default("[]") @map("eval_run_ids") @db.Json
+  // 结果矩阵: {combinations: [{vars, runId, scores, passRate}], summary: {...}}
+  resultMatrix Json?   @map("result_matrix") @db.Json
+
+  // 评测配置
+  dimensions       Json?    @db.Json  // ["accuracy", "completeness"]
+  modelConfigId    String?  @map("judge_config_id")
+
+  // 状态
+  status      String   @default("pending") @db.VarChar(20) // pending, running, completed, failed
+  totalCombinations Int @default(0) @map("total_combinations")
+  completedCombinations Int @default(0) @map("completed_combinations")
+
+  // 时间戳
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([agentId])
+  @@index([testSuiteId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("experiments")
+}
+
+// ============================================================
+// 11. Skills 健康度分析
+// ============================================================
+model SkillsAnalysis {
+  id             String   @id @default(uuid())
+  agentId        String   @map("agent_id")
+  usageStats     Json     @map("usage_stats")    // {skill_name: {count, success_rate, p50_ms}}
+  securityReview Json?    @map("security_review")
+  designReview   Json?    @map("design_review")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("skills_analysis")
+}
+
+// ============================================================
+// 12. Trace（可观测性 - 调用追踪）
+// ============================================================
+model Trace {
+  id String @id @default(uuid())
+
+  // 关联 Agent（可选，SDK 上报可能无 agentId）
+  agentId String? @map("agent_id")
+
+  // 来源：otel=OpenTelemetry自动采集, eval=评测引擎主动创建, sdk=SDK上报, manual=手动
+  source String @default("eval") @db.VarChar(20)
+
+  // 基础信息
+  name   String  @db.VarChar(500)
+  input  String? @db.LongText
+  output String? @db.LongText
+  status String  @default("ok") @db.VarChar(20) // ok, error
+
+  // 性能聚合
+  totalLatencyMs Int?   @map("total_latency_ms")
+  totalTokens    Int?   @default(0) @map("total_tokens")
+  promptTokens   Int?   @default(0) @map("prompt_tokens")
+  completionTokens Int? @default(0) @map("completion_tokens")
+  totalCost      Float? @default(0) @map("total_cost")
+
+  // 调用统计
+  llmCallCount  Int @default(0) @map("llm_call_count")
+  toolCallCount Int @default(0) @map("tool_call_count")
+
+  // 上下文
+  sessionId String? @map("session_id") @db.VarChar(200)
+  userId    String? @map("user_id") @db.VarChar(200)
+
+  // 元数据与标签
+  metadata Json?
+  tags     Json? // ["eval-platform", "agent:xxx"]
+
+  // 时间
+  startTime DateTime  @default(now()) @map("start_time")
+  endTime   DateTime? @map("end_time")
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  agent       Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  spans       Span[]
+  evalResults EvalResult[]
+  scores      Score[]
+
+  @@index([agentId])
+  @@index([source])
+  @@index([status])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([startTime])
+  @@index([createdAt])
+  @@map("traces")
+}
+
+// ============================================================
+// 13. Span（可观测性 - 调用链节点）
+// ============================================================
+model Span {
+  id String @id @default(uuid())
+
+  // 关联 Trace
+  traceId String @map("trace_id")
+
+  // 父 Span（支持嵌套树形结构）
+  parentSpanId String? @map("parent_span_id")
+
+  // 基础信息
+  name String @db.VarChar(500)
+  // 类型：llm=LLM调用, tool=工具调用, retrieval=检索, agent=子Agent, chain=链/流程, other=其他
+  kind String @default("other") @db.VarChar(20)
+
+  // 状态
+  status    String @default("ok") @db.VarChar(20) // ok, error
+  statusMessage String? @map("status_message") @db.Text
+
+  // 时间
+  startTime DateTime  @default(now()) @map("start_time")
+  endTime   DateTime? @map("end_time")
+  latencyMs Int?      @map("latency_ms")
+
+  // === LLM 特有属性 (kind='llm') ===
+  llmModel         String? @map("llm_model") @db.VarChar(200)
+  llmPrompt        String? @map("llm_prompt") @db.LongText
+  llmCompletion    String? @map("llm_completion") @db.LongText
+  llmPromptTokens  Int?    @map("llm_prompt_tokens")
+  llmCompletionTokens Int? @map("llm_completion_tokens")
+  llmTotalTokens   Int?    @map("llm_total_tokens")
+  llmTemperature   Float?  @map("llm_temperature")
+  llmCost          Float?  @map("llm_cost")
+  llmFinishReason  String? @map("llm_finish_reason") @db.VarChar(50) // stop, length, tool_calls
+
+  // === 工具调用特有属性 (kind='tool') ===
+  toolName   String? @map("tool_name") @db.VarChar(200)
+  toolInput  String? @map("tool_input") @db.LongText
+  toolOutput String? @map("tool_output") @db.LongText
+  toolStatus String? @map("tool_status") @db.VarChar(20) // success, error
+
+  // === 检索特有属性 (kind='retrieval') ===
+  retrievalQuery     String? @map("retrieval_query") @db.Text
+  retrievalDocCount  Int?    @map("retrieval_doc_count")
+  retrievalDocuments Json?   @map("retrieval_documents")
+
+  // 通用输入/输出
+  input  String? @db.LongText
+  output String? @db.LongText
+
+  // 扩展属性（OTel attributes / events）
+  attributes Json?
+  events     Json? // [{name, timestamp, attributes}]
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 关联
+  trace      Trace  @relation(fields: [traceId], references: [id], onDelete: Cascade)
+  parentSpan Span?  @relation("SpanTree", fields: [parentSpanId], references: [id], onDelete: SetNull)
+  childSpans Span[] @relation("SpanTree")
+
+  @@index([traceId])
+  @@index([parentSpanId])
+  @@index([kind])
+  @@index([status])
+  @@index([llmModel])
+  @@index([toolName])
+  @@index([startTime])
+  @@index([createdAt])
+  @@index([traceId, kind])
+  @@index([kind, createdAt])
+  @@map("spans")
+}
+
+// ============================================================
+// 14. Score（独立评分实体）
+// ============================================================
+model Score {
+  id String @id @default(uuid())
+
+  // 关联目标
+  traceId String  @map("trace_id")
+  spanId  String? @map("span_id")
+
+  // 评分内容
+  name         String  @db.VarChar(100)
+  value        Float?
+  stringValue  String? @map("string_value") @db.VarChar(200)
+  comment      String? @db.Text
+
+  // 来源追溯
+  source       String  @db.VarChar(20)     // manual, automated, sdk, user_feedback
+  author       String? @db.VarChar(100)
+  evalConfigId String? @map("eval_config_id")
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  trace Trace @relation(fields: [traceId], references: [id], onDelete: Cascade)
+
+  @@index([traceId])
+  @@index([spanId])
+  @@index([name])
+  @@index([source])
+  @@index([author])
+  @@index([createdAt])
+  @@map("scores")
+}
+
+// ============================================================
+// 15. AnnotationQueue（标注队列）
+// ============================================================
+model AnnotationQueue {
+  id String @id @default(uuid())
+
+  // 队列信息
+  name         String  @db.VarChar(200)
+  description  String? @db.Text
+
+  // 过滤条件
+  filterConfig Json @map("filter_config")
+  // 评分维度配置
+  scoreConfigs Json @map("score_configs")
+  // 分派
+  assignees Json?
+
+  // 统计
+  totalItems     Int @default(0) @map("total_items")
+  completedItems Int @default(0) @map("completed_items")
+  status         String @default("active") @db.VarChar(20)
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("annotation_queues")
+}
+
+// ============================================================
+// 16. OnlineEvalConfig（在线评估配置）
+// ============================================================
+model OnlineEvalConfig {
+  id String @id @default(uuid())
+
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  // 目标 Agent
+  agentIds Json @map("agent_ids")
+  // 评估维度（仅 referenceless 维度）
+  dimensions Json
+
+  // 模型配置
+  modelConfigId String @map("judge_config_id")
+
+  // 采样与执行
+  sampleRate Float   @default(1.0) @map("sample_rate")
+  isActive   Boolean @default(true) @map("is_active")
+
+  // 告警规则
+  alertRules Json? @map("alert_rules")
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("online_eval_configs")
+}
+
+
+// ============================================================
+// v6.0: EvalEvent 持久化队列
+// ============================================================
+
+model EvalEvent {
+  id          String    @id @default(cuid())
+  traceId     String    @map("trace_id")
+  agentId     String?   @map("agent_id")
+  payload     Json?
+  status      String    @default("pending") // pending | processing | completed | failed
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([status, createdAt])
+  @@map("eval_events")
+}
+
+// ============================================================
+// v7.0: 策略基因库（Gene Store）
+// ============================================================
+
+model Gene {
+  id          String  @id @default(uuid())
+
+  // 基础信息
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  // 策略分类: repair(修复), optimize(优化), innovate(创新)
+  category    String  @db.VarChar(20)
+
+  // 触发条件（匹配的失败类型）
+  signalsMatch Json   @map("signals_match") // ["hallucination", "tool_selection_error"]
+
+  // Prompt 补丁：追加到 system prompt 的约束文本
+  promptPatch String  @map("prompt_patch") @db.Text
+
+  // 来源追溯
+  source      String  @db.VarChar(20) // bad_case, manual, experiment, import
+  sourceId    String? @map("source_id") // 关联的 BadCase ID 或 Experiment ID
+
+  // 关联 Agent（null 表示通用策略）
+  agentId     String? @map("agent_id")
+
+  // 状态与指标
+  isActive       Boolean @default(true) @map("is_active")
+  effectiveness  Float?  @default(0)    // 有效性评分 0-10（实验验证后更新）
+  usageCount     Int     @default(0) @map("usage_count")
+
+  // 元数据
+  tags     Json?
+  metadata Json? // 扩展元数据，兼容 GEP 格式导出
+
+  // 时间戳
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  agent Agent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([category])
+  @@index([source])
+  @@index([isActive])
+  @@index([effectiveness])
+  @@index([createdAt])
+  @@map("genes")
+}
+
+// ============================================================
+// v7.0: 进化事件追踪
+// ============================================================
+
+model EvolutionEvent {
+  id          String  @id @default(uuid())
+
+  // 关联 Agent
+  agentId     String  @map("agent_id")
+
+  // 事件类型: eval_completed, strategy_applied, milestone, regression
+  eventType   String  @map("event_type") @db.VarChar(30)
+
+  // 关联评测运行
+  evalRunId   String? @map("eval_run_id")
+
+  // 关联策略
+  geneIds     Json?   @map("gene_ids") // 关联的策略 Gene ID 列表
+
+  // 分数快照
+  scoresBefore Json?  @map("scores_before") // 应用策略前的维度分数
+  scoresAfter  Json?  @map("scores_after")  // 应用策略后的维度分数
+  overallScore Float? @map("overall_score")
+  passRate     Float? @map("pass_rate")
+
+  // 描述
+  summary     String? @db.Text
+  metadata    Json?
+
+  // 时间戳
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([agentId, createdAt])
+  @@index([eventType])
+  @@index([evalRunId])
+  @@map("evolution_events")
+}
+
+// ============================================================
+// v7.0: 评测知识沉淀
+// ============================================================
+
+model EvalKnowledge {
+  id                  String @id @default(uuid())
+
+  // 关联
+  agentId             String @map("agent_id")
+  agentCategory       String @map("agent_category") @db.VarChar(30) // customer_service, coding, etc.
+  evalRunId           String @map("eval_run_id")
+
+  // 评测知识快照
+  failureDistribution Json   @map("failure_distribution") // {"hallucination": 0.35, "tool_selection_error": 0.20}
+  dimensionStats      Json   @map("dimension_stats")      // {"faithfulness": {"mean": 7.8, "std": 0.6, "min": 3.2, "max": 9.8}}
+  effectiveAssertions Json?  @map("effective_assertions")  // [{"type": "not_contains", "value": "...", "discrimination": 0.85}]
+
+  // 统计
+  totalCases   Int   @map("total_cases")
+  passRate     Float @map("pass_rate")
+  overallScore Float @map("overall_score")
+
+  // 元数据
+  metadata     Json?
+
+  // 时间戳
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([agentCategory, createdAt])
+  @@index([agentId])
+  @@index([evalRunId])
+  @@map("eval_knowledge")
+}

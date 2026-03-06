@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # ===== MySQL 数据库 =====
+  mysql:
+    image: mysql:8.0
+    container_name: agent-eval-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agent_eval_platform}
+      MYSQL_USER: ${MYSQL_USER:-agent_eval}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agent_eval_pass}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/migrations/mvp_schema.sql:/docker-entrypoint-initdb.d/01_mvp_schema.sql
+      - ./backend/migrations/v3.1_experiments.sql:/docker-entrypoint-initdb.d/02_v3.1_experiments.sql
+      - ./backend/migrations/v4.0_otel_traces_spans.sql:/docker-entrypoint-initdb.d/03_v4.0_otel_traces_spans.sql
+      - ./backend/migrations/v5.0_platform_upgrade.sql:/docker-entrypoint-initdb.d/04_v5.0_platform_upgrade.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER:-agent_eval}", "-p${MYSQL_PASSWORD:-agent_eval_pass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+
+  # ===== Agent 评测平台 =====
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-eval-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-agent_eval}:${MYSQL_PASSWORD:-agent_eval_pass}@mysql:3306/${MYSQL_DATABASE:-agent_eval_platform}
+      JUDGE_LLM_BASE_URL: ${JUDGE_LLM_BASE_URL:-https://api.deepseek.com/v1}
+      JUDGE_LLM_API_KEY: ${JUDGE_LLM_API_KEY:-your-api-key-here}
+      JUDGE_LLM_MODEL: ${JUDGE_LLM_MODEL:-deepseek-chat}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/dashboard')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  mysql_data:
+    driver: local

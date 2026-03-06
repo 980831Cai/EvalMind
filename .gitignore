@@ -1,0 +1,65 @@
+# ========== Environment ==========
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ========== Python ==========
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ========== Node ==========
+node_modules/
+frontend/dist/
+sdk/typescript/dist/
+
+# ========== IDE ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# ========== Logs ==========
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ========== Database ==========
+*.db
+*.sqlite3
+
+# ========== Internal / AI-generated docs ==========
+CODEBUDDY.md
+docs/optimization-action-plan.md
+docs/optimization-plan.md
+docs/team-review-report.md
+docs/v6-integration-plan.md
+docs/mvp-database-design.md
+docs/eval-framework-assessment-report.md
+
+# ========== Misc ==========
+*.tgz
+*.tar.gz
+.cache/
