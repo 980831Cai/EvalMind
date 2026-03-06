@@ -199,26 +199,52 @@ CREATE TABLE IF NOT EXISTS eval_results (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评测结果表';
 
 -- ============================================================
--- 初始化数据
+-- Default Model Config Templates (API keys must be provided by user)
 -- ============================================================
 
--- 插入默认模型配置（示例）
+-- OpenAI
 INSERT INTO judge_config (
-    provider,
-    model_name,
-    base_url,
-    api_key,
-    temperature,
-    max_tokens,
-    is_active
+    provider, model_name, base_url, api_key,
+    temperature, max_tokens, is_active
 ) VALUES (
-    'openai',
-    'gpt-4o',
-    'https://api.openai.com/v1',
-    'your-api-key-here',  -- 需要替换为实际 API Key
-    0.3,
-    2048,
-    TRUE
+    'openai', 'gpt-4o', 'https://api.openai.com/v1', '',
+    0.3, 2048, FALSE
+) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
+
+-- DeepSeek
+INSERT INTO judge_config (
+    provider, model_name, base_url, api_key,
+    temperature, max_tokens, is_active
+) VALUES (
+    'deepseek', 'deepseek-chat', 'https://api.deepseek.com/v1', '',
+    0.3, 2048, FALSE
+) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
+
+-- Anthropic Claude
+INSERT INTO judge_config (
+    provider, model_name, base_url, api_key,
+    temperature, max_tokens, is_active
+) VALUES (
+    'anthropic', 'claude-sonnet-4-20250514', 'https://api.anthropic.com/v1', '',
+    0.3, 2048, FALSE
+) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
+
+-- Google Gemini
+INSERT INTO judge_config (
+    provider, model_name, base_url, api_key,
+    temperature, max_tokens, is_active
+) VALUES (
+    'google', 'gemini-2.0-flash', 'https://generativelanguage.googleapis.com/v1beta/openai', '',
+    0.3, 2048, FALSE
+) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
+
+-- Local Ollama (no API key needed)
+INSERT INTO judge_config (
+    provider, model_name, base_url, api_key,
+    temperature, max_tokens, is_active
+) VALUES (
+    'ollama', 'qwen2.5:14b', 'http://localhost:11434/v1', 'ollama',
+    0.3, 2048, FALSE
 ) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP;
 
 -- ============================================================

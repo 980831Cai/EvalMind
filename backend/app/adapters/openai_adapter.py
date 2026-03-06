@@ -1,6 +1,6 @@
-"""OpenAI 兼容协议适配器
+"""OpenAI-compatible protocol adapter
 
-配置示例:
+Config example:
 {
     "base_url": "https://api.openai.com/v1",
     "api_key": "sk-xxx",
@@ -21,7 +21,7 @@ logger = get_logger("openai_adapter")
 
 
 class OpenAIAdapter(BaseAdapter):
-    """OpenAI 兼容协议适配器（支持任何兼容 OpenAI Chat API 的服务）"""
+    """OpenAI-compatible protocol adapter (supports any OpenAI Chat API compatible service)"""
 
     def validate_config(self) -> bool:
         return bool(self.config.get("base_url") and self.config.get("api_key"))
@@ -61,7 +61,7 @@ class OpenAIAdapter(BaseAdapter):
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             usage = data.get("usage", {})
 
-            # 提取工具调用（如果有）
+            # Extract tool calls (if any)
             tool_calls_raw = data.get("choices", [{}])[0].get("message", {}).get("tool_calls", [])
             tool_calls = []
             trajectory_steps: list[TrajectoryStep] = []
@@ -73,7 +73,7 @@ class OpenAIAdapter(BaseAdapter):
                 tool_calls.append({"name": tc_name, "arguments": tc_args})
                 trajectory_steps.append(TrajectoryStep(
                     step_index=step_idx, step_type="tool_call",
-                    content=f"调用工具: {tc_name}",
+                    content=f"Tool call: {tc_name}",
                     tool_name=tc_name, tool_args=tc_args,
                     timestamp_ms=0,
                 ))

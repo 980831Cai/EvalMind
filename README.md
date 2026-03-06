@@ -86,7 +86,8 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env — fill in DATABASE_URL and JUDGE_LLM_API_KEY
+# Edit .env — choose your LLM provider and fill in your API key
+# Supported: OpenAI / DeepSeek / Anthropic / Google Gemini / Ollama
 
 # Initialize database
 npx prisma generate
@@ -212,11 +213,14 @@ Create EvalRun → Snapshot Agent & TestSuite → Async Execution
 |---|---|---|
 | **OpenAI** | `https://api.openai.com/v1` | `gpt-4o` / `gpt-4o-mini` |
 | **DeepSeek** | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| **Anthropic** | `https://api.anthropic.com/v1` | `claude-sonnet-4-20250514` |
+| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
 | **Ollama** (local) | `http://localhost:11434/v1` | `qwen2.5:14b` |
 | **vLLM** | `http://localhost:8080/v1` | custom model name |
 | **Azure OpenAI** | `https://{name}.openai.azure.com/...` | deployment name |
 
 > Any service compatible with the OpenAI Chat Completions API can be used.
+> Pre-configured model templates are available in the Settings page — just add your API key.
 
 ---
 

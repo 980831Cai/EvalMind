@@ -1,4 +1,4 @@
-"""模型配置管理 API"""
+"""Model configuration management API"""
 import httpx
 from datetime import datetime
 from typing import List
@@ -67,7 +67,7 @@ async def list_model_configs():
 async def get_model_config(config_id: str):
     record = await prisma.modelconfig.find_unique(where={"id": config_id})
     if not record:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+        raise HTTPException(status_code=404, detail="Model config not found")
     return _to_response(record)
 
 
@@ -75,7 +75,7 @@ async def get_model_config(config_id: str):
 async def update_model_config(config_id: str, data: ModelConfigUpdate):
     record = await prisma.modelconfig.find_unique(where={"id": config_id})
     if not record:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+        raise HTTPException(status_code=404, detail="Model config not found")
 
     update_data = {}
     if data.name is not None:
@@ -107,16 +107,16 @@ async def update_model_config(config_id: str, data: ModelConfigUpdate):
 async def delete_model_config(config_id: str):
     record = await prisma.modelconfig.find_unique(where={"id": config_id})
     if not record:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+        raise HTTPException(status_code=404, detail="Model config not found")
     await prisma.modelconfig.delete(where={"id": config_id})
-    return {"message": "已删除"}
+    return {"message": "Deleted"}
 
 
 @router.post("/{config_id}/test")
 async def test_model_config(config_id: str):
     record = await prisma.modelconfig.find_unique(where={"id": config_id})
     if not record:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+        raise HTTPException(status_code=404, detail="Model config not found")
 
     start = datetime.now()
     status = "success"
@@ -155,7 +155,7 @@ async def test_model_config(config_id: str):
 async def toggle_activate(config_id: str):
     record = await prisma.modelconfig.find_unique(where={"id": config_id})
     if not record:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+        raise HTTPException(status_code=404, detail="Model config not found")
     updated = await prisma.modelconfig.update(
         where={"id": config_id},
         data={"isActive": not record.isActive},
